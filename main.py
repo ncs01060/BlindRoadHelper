@@ -1,23 +1,25 @@
 from ultralytics import YOLO
 import cv2
 import numpy as np
+import os
 
 # --- 1. 경로 설정 및 다중 모델 로딩 ---
 model_path_block = "./block.pt"
 model_path_scooter = "./scooter.pt"
-image_path = "imagePath"  # 분석할 이미지로 경로 변경
-output_path = "braille_navigation_result_multi_model.jpg"
+model_path_sinho = "./sinho.pt"
+image_path = "/Users/leeyoungmin/Desktop/ss/img/art_17306089943438_dbdbda.jpg"
+output_path = "output/braille_navigation_result_multi_model.jpg"
 
 print("모델을 로드합니다...")
 model_block = YOLO(model_path_block)
 model_scooter = YOLO(model_path_scooter)
+model_sinho = YOLO(model_path_sinho)
 
 image = cv2.imread(image_path)
 if image is None:
     raise IOError(f"이미지를 로드하는 데 실패했습니다: {image_path}")
 output = image.copy()
 
-# 동적 화살표 크기 계산
 h, w, _ = image.shape
 arrow_length = int(np.sqrt(h**2 + w**2) * 0.15)
 arrow_thickness = max(2, int(w / 120))
@@ -26,7 +28,7 @@ arrow_thickness = max(2, int(w / 120))
 print("각 모델에 대해 객체 탐지를 수행합니다...")
 results_block = model_block(image_path)[0]
 results_scooter = model_scooter(image_path)[0]
-
+results_sinho = model_sinho(image_path)[0]  # 🔺 신호등 모델 추가
 
 # --- 3. 보조 함수 ---
 def merge_close_boxes(boxes, iou_threshold=0.7):
@@ -119,18 +121,25 @@ else:
     cv2.putText(output, "State : Straight", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
 
 
-# ★★★★★ 5. 스쿠터 모델 결과 처리 및 시각화 (복원된 기능) ★★★★★
+# --- 5. 스쿠터 모델 결과 처리 및 시각화 ---
 print(f"--- 장애물 탐지: {len(results_scooter.boxes)}개의 잠재적 스쿠터 발견 ---")
 for box in results_scooter.boxes:
     confidence = float(box.conf[0])
     if confidence > 0.5:
         x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
-        obstacle_color = (255, 0, 255) # 자홍색
+        obstacle_color = (255, 0, 255)
         cv2.rectangle(output, (x1, y1), (x2, y2), obstacle_color, arrow_thickness)
         label = f"Scooter: {confidence:.2f}"
         cv2.putText(output, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, obstacle_color, 2)
 
 
-# --- 6. 최종 결과 저장 및 출력 ---
+# --- 6. 신호등 존재 여부 판단 ---
+signal_detected = len(results_sinho.boxes) > 0
+signal_text = "Signal: Detected" if signal_detected else "Signal: Not Detected"
+signal_color = (0, 200, 255) if signal_detected else (100, 100, 100)
+cv2.putText(output, signal_text, (w - 310, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, signal_color, 2)
+print(f"신호등 감지 여부: {signal_detected}")
+
+# --- 7. 결과 저장 ---
 cv2.imwrite(output_path, output)
-print(f"결과 이미지가 '{output_path}' 이름으로 저장되었습니다.")
+print(f"결과 이미지가 '{output_path}'에 저장되었습니다.")
