@@ -1,0 +1,14 @@
+<!-- templates/result.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>처리 결과</title>
+</head>
+<body>
+    <h1>처리된 이미지</h1>
+    <img src="data:image/jpeg;base64,{{ image }}" alt="처리 결과"><br><br>
+    <strong>감지된 클래스:</strong> {{ classes }}<br>
+    <strong>감지된 박스 수:</strong> {{ boxes|length }}<br>
+    <strong>네비게이션 정보:</strong> {{ navigation }}<br>
+</body>
+</html>

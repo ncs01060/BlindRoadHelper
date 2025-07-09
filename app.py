@@ -1,4 +1,4 @@
-from flask import Flask, render_template, Response
+from flask import Flask, render_template,request, redirect, url_for, Response
 from flask_socketio import SocketIO, emit
 import cv2
 import numpy as np
@@ -30,8 +30,13 @@ def index():
 def handle_toggle_grayscale(data):
     global grayscale_mode
     grayscale_mode = data
+    print("Test")
     print(f"흑백 모드 변경됨: {grayscale_mode}")
     return {'status': 'success', 'grayscale_mode': grayscale_mode}
+
+@socketio.on('start-camera')
+def handle_start_camera():
+    print('test')
 
 @socketio.on('connect')
 def handle_connect():
@@ -98,6 +103,50 @@ def handle_image(data):
     }
     
     emit('result', response_data)
+
+
+@app.route('/upload', methods=['GET', 'POST'])
+def upload_image():
+    if request.method == 'POST':
+        if 'image' not in request.files:
+            return 'No file part'
+        
+        file = request.files['image']
+        if file.filename == '':
+            return 'No selected file'
+        
+        # 파일 -> 이미지 배열로 변환
+        file_bytes = np.frombuffer(file.read(), np.uint8)
+        img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
+        if img is None:
+            return 'Invalid image'
+
+        # 흑백 모드 적용
+        if grayscale_mode:
+            print("흑백 모드로 이미지 처리 중...")
+            img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            img = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
+
+        # 모델 처리
+        result_img, detected_classes, detected_boxes, navigation_info = navigation_model.detect(img)
+
+        if grayscale_mode:
+            result_gray = cv2.cvtColor(result_img, cv2.COLOR_BGR2GRAY)
+            result_img = cv2.cvtColor(result_gray, cv2.COLOR_GRAY2BGR)
+
+        # 이미지 -> base64 인코딩
+        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 100]
+        _, buffer = cv2.imencode('.jpg', result_img, encode_param)
+        result_data = base64.b64encode(buffer).decode('utf-8')
+
+        return render_template('result.html',
+                               image=result_data,
+                               classes=detected_classes,
+                               boxes=detected_boxes,
+                               navigation=navigation_info)
+
+    return render_template('upload.html')
 
 if __name__ == '__main__':
     # SSL 인증서 경로
