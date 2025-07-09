@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시각장애인을 위한 도로 안내 시스템</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>시각장애인을 위한 도로 안내 시스템</h1>
+        
+        <!-- 안내 메시지 영역 -->
+        <div id="instruction-box" class="instruction">
+            <p id="instruction-text">카메라를 시작하세요</p>
+        </div>
+        
+        <div class="video-container">
+            <!-- 카메라 입력은 숨김 처리 -->
+            <div class="video-wrapper hidden">
+                <video id="webcam" autoplay playsinline></video>
+            </div>
+            
+            <!-- 결과 영역만 표시 -->
+            <div class="video-wrapper result-wrapper">
+                <h2>카메라 뷰</h2>
+                <img id="result" src="">
+                <div class="button-container">
+                    <button id="start-camera">카메라 시작</button>
+                    <button id="toggle-grayscale" class="grayscale-toggle">흑백 모드</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="status">
+            <p id="status-text">서버에 연결 중...</p>
+        </div>
+        
+        <!-- 네비게이션 정보 표시 -->
+        <div id="navigation-info" class="navigation-info">
+            <div class="nav-item">
+                <strong>상태:</strong> <span id="nav-state">알 수 없음</span>
+            </div>
+            <div class="nav-item">
+                <strong>방향:</strong> <span id="nav-direction">없음</span>
+            </div>
+            <div class="nav-item">
+                <strong>신호등:</strong> <span id="nav-signal">없음</span>
+            </div>
+            <div class="nav-item">
+                <strong>음향신호기:</strong> <span id="nav-button">없음</span>
+            </div>
+            <div class="nav-item">
+                <strong>장애물:</strong> <span id="nav-obstacles">없음</span>
+            </div>
+        </div>
+        
+        <!-- 경고 메시지 영역 -->
+        <div id="warning-box" class="warning-box hidden">
+            <div class="warning-content">
+                <h3>⚠️ 경고</h3>
+                <ul id="warning-list"></ul>
+            </div>
+        </div>
+        
+        <!-- 디버깅 정보 영역 -->
+        <div id="debug-info" class="debug-info">
+            <details>
+                <summary>디버깅 정보</summary>
+                <div id="debug-content">
+                    <p>감지된 클래스: <span id="debug-classes">없음</span></p>
+                    <p>감지된 박스 수: <span id="debug-boxes">0</span></p>
+                    <p>이미지 모드: <span id="debug-mode">컬러</span></p>
+                    <p>처리 상태: <span id="debug-status">대기중</span></p>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

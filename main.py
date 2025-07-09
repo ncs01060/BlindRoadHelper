@@ -7,6 +7,7 @@ import os
 model_path_block = "./block.pt"
 model_path_scooter = "./scooter.pt"
 model_path_sinho = "./sinho.pt"
+model_path_button = "./button.pt"
 image_path = "/Users/leeyoungmin/Desktop/ss/img/art_17306089943438_dbdbda.jpg"
 output_path = "output/braille_navigation_result_multi_model.jpg"
 
@@ -14,6 +15,7 @@ print("모델을 로드합니다...")
 model_block = YOLO(model_path_block)
 model_scooter = YOLO(model_path_scooter)
 model_sinho = YOLO(model_path_sinho)
+model_button = YOLO(model_path_button)
 
 image = cv2.imread(image_path)
 if image is None:
@@ -29,6 +31,7 @@ print("각 모델에 대해 객체 탐지를 수행합니다...")
 results_block = model_block(image_path)[0]
 results_scooter = model_scooter(image_path)[0]
 results_sinho = model_sinho(image_path)[0]  # 🔺 신호등 모델 추가
+results_button = model_button(image_path)[0]  # 🔺 음향 신호기 모델 추가
 
 # --- 3. 보조 함수 ---
 def merge_close_boxes(boxes, iou_threshold=0.7):
@@ -140,6 +143,13 @@ signal_color = (0, 200, 255) if signal_detected else (100, 100, 100)
 cv2.putText(output, signal_text, (w - 310, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, signal_color, 2)
 print(f"신호등 감지 여부: {signal_detected}")
 
-# --- 7. 결과 저장 ---
+# --- 7. 음향 신호기 존재 여부 판단 ---
+button_detected = len(results_button.boxes) > 0
+button_text = "Sound Button: Detected" if button_detected else "Sound Button: Not Detected"
+button_color = (0, 255, 200) if button_detected else (100, 100, 100)
+cv2.putText(output, button_text, (w - 350, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.0, button_color, 2)
+print(f"음향 신호기 감지 여부: {button_detected}")
+
+# --- 8. 결과 저장 ---
 cv2.imwrite(output_path, output)
 print(f"결과 이미지가 '{output_path}'에 저장되었습니다.")

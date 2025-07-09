@@ -1,2 +1,8 @@
 opencv-python
 ultralytics
+flask
+flask-socketio
+cryptography
+numpy
+torch
+torchvision
