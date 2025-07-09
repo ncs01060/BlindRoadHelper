@@ -10,6 +10,8 @@ import json
 from model import BlindNavigationModel
 
 app = Flask(__name__)
+
+#개발용 시크릿 키
 app.config['SECRET_KEY'] = 'blind-road-helper-secret-key'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
