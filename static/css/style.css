@@ -112,6 +112,19 @@ h1 {
     display: block;
     max-height: 400px;
     object-fit: cover;
+    transition: filter 0.3s ease; /* 부드러운 전환 효과 */
+}
+
+/* 흑백 모드 필터 */
+.video-wrapper video.grayscale,
+.video-wrapper img.grayscale {
+    filter: grayscale(100%);
+}
+
+/* 오버레이 캔버스도 흑백 모드 적용 */
+.camera-container canvas.grayscale {
+    filter: grayscale(100%);
+    transition: filter 0.3s ease;
 }
 
 .button-container {
