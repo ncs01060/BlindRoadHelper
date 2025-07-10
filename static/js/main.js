@@ -45,15 +45,91 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentArrows = null; // 화살표 정보 저장
     let renderTimer = null;
     
+    // TTS 관리 변수들
+    let isTTSSpeaking = false;
+    let ttsQueue = null; // 최신 메시지만 저장
+    let ttsTimer = null; // 지연 실행용 타이머
+    let currentUtterance = null; // 현재 실행 중인 utterance
+    
     function speak(text) {
+        // 기존 TTS 즉시 취소
+        speechSynthesis.cancel();
+        if (currentUtterance) {
+            currentUtterance = null;
+        }
+        
         speechSynthesis.resume(); // 음성 예열
-    const testUtterance = new SpeechSynthesisUtterance(text);
-    testUtterance.lang = 'ko-KR';
-    speechSynthesis.speak(testUtterance);
-
+        const testUtterance = new SpeechSynthesisUtterance(text);
+        testUtterance.lang = 'ko-KR';
+        testUtterance.rate = 1.5; // 음성 속도 1.5배로 설정
+        
+        // TTS 시작/종료 이벤트 처리
+        testUtterance.onstart = () => {
+            isTTSSpeaking = true;
+            console.log('TTS 시작:', text);
+        };
+        
+        testUtterance.onend = () => {
+            isTTSSpeaking = false;
+            currentUtterance = null;
+            console.log('TTS 완료:', text);
+            
+            // TTS가 끝난 후 큐에 대기 중인 메시지가 있으면 실행
+            if (ttsQueue) {
+                const nextMessage = ttsQueue;
+                ttsQueue = null;
+                // 약간의 지연 후 다음 메시지 실행
+                setTimeout(() => {
+                    if (!isTTSSpeaking) { // 혹시 다른 TTS가 시작되지 않았다면
+                        speak(nextMessage);
+                    }
+                }, 100);
+            }
+        };
+        
+        testUtterance.onerror = () => {
+            isTTSSpeaking = false;
+            currentUtterance = null;
+            console.log('TTS 오류:', text);
+        };
+        
+        currentUtterance = testUtterance;
+        speechSynthesis.speak(testUtterance);
     }
+    
     function cancel_the_speak() {
         speechSynthesis.cancel();
+        isTTSSpeaking = false;
+        currentUtterance = null;
+        ttsQueue = null;
+        if (ttsTimer) {
+            clearTimeout(ttsTimer);
+            ttsTimer = null;
+        }
+    }
+    
+    // 지연된 TTS 실행 - 최신 메시지만 읽도록 함
+    function speakWithDelay(text, delay = 300) {
+        // 기존 타이머 취소
+        if (ttsTimer) {
+            clearTimeout(ttsTimer);
+        }
+        
+        // 현재 TTS가 진행 중이면 큐에 저장
+        if (isTTSSpeaking) {
+            ttsQueue = text;
+            return;
+        }
+        
+        // 지연 후 실행 (이 시간 동안 더 새로운 메시지가 오면 덮어씀)
+        ttsTimer = setTimeout(() => {
+            if (!isTTSSpeaking) { // 타이머 실행 시점에 TTS가 진행 중이 아니면 실행
+                speak(text);
+            } else {
+                ttsQueue = text; // 진행 중이면 큐에 저장
+            }
+            ttsTimer = null;
+        }, delay);
     }
 
     // Socket.IO 연결 설정
@@ -666,8 +742,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateInstruction(message, type) {
         instructionText.textContent = message;
         instructionBox.className = `instruction ${type}`;
-        if (before != message) {speak(message)}
-        before = message
+        
+        // 이전 메시지와 다를 때만 TTS 실행
+        if (before != message) {
+            // 지연된 TTS 실행으로 최신 메시지만 읽도록 함
+            speakWithDelay(message);
+            before = message;
+        }
+        
         // 중요한 메시지는 진동으로 알림 (모바일 지원)
         if (type === 'danger' || type === 'warning') {
             if (navigator.vibrate) {
@@ -879,6 +961,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (socket) {
             socket.disconnect();
         }
+        // TTS 정리
+        cancel_the_speak();
     });
     
     // 화면 방향 변경 시 캔버스 크기 조정
