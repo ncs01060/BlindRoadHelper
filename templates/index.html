@@ -16,20 +16,21 @@
         </div>
         
         <div class="video-container">
-            <!-- 카메라 입력은 숨김 처리 -->
-            <div class="video-wrapper hidden">
-                <video id="webcam" autoplay playsinline></video>
-            </div>
-            
-            <!-- 결과 영역만 표시 -->
-            <div class="video-wrapper result-wrapper">
-                <h2>카메라 뷰</h2>
-                <img id="result" src="">
+            <!-- 실시간 카메라 영역 -->
+            <div class="video-wrapper camera-wrapper">
+                <h2>실시간 카메라</h2>
+                <div class="camera-container">
+                    <video id="webcam" autoplay playsinline muted></video>
+                    <!-- 오버레이 캔버스는 JavaScript에서 동적으로 생성됩니다 -->
+                </div>
                 <div class="button-container">
                     <button id="start-camera">카메라 시작</button>
                     <button id="toggle-grayscale" class="grayscale-toggle">흑백 모드</button>
                 </div>
             </div>
+            
+            <!-- 결과 이미지는 숨김 처리 (더 이상 사용하지 않음) -->
+            <img id="result" src="" style="display: none;">
         </div>
         
         <div class="status">

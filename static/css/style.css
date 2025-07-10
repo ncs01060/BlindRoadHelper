@@ -93,7 +93,7 @@ h1 {
 }
 
 .video-wrapper.hidden {
-    display: none;
+    display: none !important;
 }
 
 .video-wrapper h2 {
@@ -259,6 +259,52 @@ button:active {
 .debug-info span {
     color: #007bff;
     font-weight: bold;
+}
+
+/* 카메라 컨테이너 스타일 */
+.camera-container {
+    position: relative;
+    width: 100%;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    min-height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.camera-wrapper {
+    display: block !important;
+}
+
+.video-wrapper video {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 400px;
+    min-height: 200px;
+    object-fit: cover;
+    background: #000;
+    border-radius: 10px;
+}
+
+/* 오버레이 캔버스 스타일 (JavaScript에서 동적으로 생성) */
+.camera-container canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 10;
+    border-radius: 10px;
+}
+
+/* 비디오가 로드되지 않았을 때 표시할 메시지 */
+.camera-container:empty::before {
+    content: "카메라를 시작하세요";
+    color: #fff;
+    font-size: 1.2em;
+    text-align: center;
 }
 
 /* 반응형 디자인 */

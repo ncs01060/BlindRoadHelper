@@ -95,9 +95,12 @@ class BlindNavigationModel:
         # 네비게이션 정보 생성
         navigation_info = self._generate_navigation_info(model_results, detected_classes, detected_boxes)
         
+        # 화살표 정보 생성
+        arrow_info = self._generate_arrow_info(image, model_results)
+        
         all_box_coords = [item['box'] for item in detected_boxes]
         
-        return all_box_coords, detected_classes, detected_boxes, navigation_info
+        return all_box_coords, detected_classes, detected_boxes, navigation_info, arrow_info
     
     def _process_block_results(self, results):
         """블록 모델 결과 처리"""
@@ -383,6 +386,97 @@ class BlindNavigationModel:
         cos_angle = dot_product / (norm_v1 * norm_v2)
         return np.degrees(np.arccos(np.clip(cos_angle, -1.0, 1.0)))
     
+    def _generate_arrow_info(self, image, model_results):
+        """화살표 정보 생성 - 클라이언트에서 렌더링하기 위한 데이터"""
+        arrow_info = {
+            'arrows': [],
+            'state_text': '',
+            'state_color': '#FFFF00'
+        }
+        
+        if not model_results.get('block') or not model_results['block'].boxes:
+            return arrow_info
+        
+        h, w, _ = image.shape
+        arrow_length = int(np.sqrt(h**2 + w**2) * 0.15)
+        
+        # 블록 모델 결과 분석
+        initial_stop_boxes, go_boxes = [], []
+        
+        for box_data in model_results['block'].boxes:
+            cls_id = int(box_data.cls[0])
+            confidence = float(box_data.conf[0])
+            box = box_data.xyxy[0].cpu().numpy().astype(int)
+            
+            if confidence >= self.conf_threshold:
+                if cls_id == 1:  # Stop
+                    initial_stop_boxes.append(box)
+                else:  # Go_Forward
+                    go_boxes.append(box)
+        
+        # 겹치는 박스 병합
+        stop_boxes = self._merge_close_boxes(initial_stop_boxes)
+        
+        # 경로 분석 및 화살표 정보 생성
+        if stop_boxes and go_boxes:
+            # 교차로 상황
+            arrow_info['state_text'] = 'Intersection'
+            arrow_info['state_color'] = '#00FF00'
+            
+            for stop_box in stop_boxes:
+                stop_center = self._get_box_center(stop_box)
+                proximity_threshold = (stop_box[2] - stop_box[0]) * 3.0
+                
+                candidate_vectors = []
+                for go_box in go_boxes:
+                    go_center = self._get_box_center(go_box)
+                    vec = go_center - stop_center
+                    if 0 < np.linalg.norm(vec) < proximity_threshold:
+                        candidate_vectors.append(vec)
+                
+                if candidate_vectors:
+                    # 방향 클러스터링 및 화살표 정보 생성
+                    clustered_directions = self._cluster_directions(candidate_vectors)
+                    for vec in clustered_directions:
+                        norm_vec = vec / (np.linalg.norm(vec) + 1e-6)
+                        endpoint = stop_center + (norm_vec * arrow_length)
+                        
+                        arrow_info['arrows'].append({
+                            'type': 'intersection',
+                            'start': [int(stop_center[0]), int(stop_center[1])],
+                            'end': [int(endpoint[0]), int(endpoint[1])],
+                            'color': '#FFFF00'
+                        })
+        
+        elif go_boxes:
+            # 직진 상황
+            arrow_info['state_text'] = 'Straight'
+            arrow_info['state_color'] = '#00FFFF'
+            
+            all_path_points = []
+            for box in go_boxes:
+                x1, y1, x2, y2 = box
+                step = (y2 - y1) // 4
+                if step > 0:
+                    for i in range(4):
+                        all_path_points.append(np.array([(x1+x2)//2, y1+i*step+step//2]))
+                else:
+                    all_path_points.append(self._get_box_center(box))
+            
+            if len(all_path_points) >= 2:
+                all_path_points.sort(key=lambda pt: pt[1], reverse=True)
+                for i in range(len(all_path_points) - 1):
+                    pt1, pt2 = all_path_points[i], all_path_points[i+1]
+                    if pt1[1] > pt2[1]:
+                        arrow_info['arrows'].append({
+                            'type': 'straight',
+                            'start': [int(pt1[0]), int(pt1[1])],
+                            'end': [int(pt2[0]), int(pt2[1])],
+                            'color': '#FF0000'
+                        })
+        
+        return arrow_info
+
     def _generate_navigation_info(self, model_results, detected_classes, detected_boxes):
         """네비게이션 정보 생성"""
         navigation_info = {
@@ -424,41 +518,3 @@ class BlindNavigationModel:
             navigation_info['warnings'].append('전방에 장애물이 있으니 주의하세요')
         
         return navigation_info
-
-    def get_block_details(self, image):
-        """블록 모델의 상세 정보를 반환 (화살표 렌더링용)"""
-        if not self.models['block']:
-            return {'stop_boxes': [], 'go_boxes': [], 'merged_stop_boxes': []}
-        
-        try:
-            results_block = self.models['block'](image, verbose=False, conf=self.conf_threshold)
-            block_results = results_block[0]
-            
-            if not block_results.boxes:
-                return {'stop_boxes': [], 'go_boxes': [], 'merged_stop_boxes': []}
-            
-            initial_stop_boxes, go_boxes = [], []
-            
-            for box_data in block_results.boxes:
-                cls_id = int(box_data.cls[0])
-                confidence = float(box_data.conf[0])
-                box = box_data.xyxy[0].cpu().numpy().astype(int).tolist()
-                
-                if confidence >= self.conf_threshold:
-                    if cls_id == 1:  # Stop
-                        initial_stop_boxes.append(box)
-                    else:  # Go_Forward (cls_id == 0)
-                        go_boxes.append(box)
-            
-            # 겹치는 Stop 박스 병합
-            merged_stop_boxes = self._merge_close_boxes(initial_stop_boxes)
-            
-            return {
-                'stop_boxes': initial_stop_boxes,
-                'go_boxes': go_boxes,
-                'merged_stop_boxes': merged_stop_boxes
-            }
-            
-        except Exception as e:
-            print(f"블록 상세 정보 추출 오류: {e}")
-            return {'stop_boxes': [], 'go_boxes': [], 'merged_stop_boxes': []}
