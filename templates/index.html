@@ -46,9 +46,6 @@
                 <strong>방향:</strong> <span id="nav-direction">없음</span>
             </div>
             <div class="nav-item">
-                <strong>신호등:</strong> <span id="nav-signal">없음</span>
-            </div>
-            <div class="nav-item">
                 <strong>음향신호기:</strong> <span id="nav-button">없음</span>
             </div>
             <div class="nav-item">
@@ -101,7 +98,6 @@ socket.on('result', function(data) {
     const nav = data.navigation || {};
     document.getElementById('nav-state').textContent = nav.state || '없음';
     document.getElementById('nav-direction').textContent = nav.direction || '없음';
-    document.getElementById('nav-signal').textContent = nav.signal || '없음';
     document.getElementById('nav-button').textContent = nav.button || '없음';
     document.getElementById('nav-obstacles').textContent = nav.obstacles || '없음';
 

@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // 네비게이션 정보 요소들
     const navState = document.getElementById('nav-state');
     const navDirection = document.getElementById('nav-direction');
-    const navSignal = document.getElementById('nav-signal');
     const navButton = document.getElementById('nav-button');
     const navObstacles = document.getElementById('nav-obstacles');
     
@@ -287,7 +286,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const modelColors = {
             'block': '#FFD700',    // 골드 (블록 - Go_Forward, Stop)
             'scooter': '#FF1493',  // 딥핑크 (스쿠터)
-            'sinho': '#FF4500',    // 오렌지레드 (신호등)
             'button': '#00FF7F'    // 스프링그린 (음향 신호기)
         };
         return modelColors[model] || '#FFFFFF';
@@ -298,7 +296,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const textColors = {
             'block': '#000000',    // 검은색 (노란 배경에)
             'scooter': '#FFFFFF',  // 흰색 (딥핑크 배경에)
-            'sinho': '#FFFFFF',    // 흰색 (오렌지레드 배경에)
             'button': '#000000'    // 검은색 (스프링그린 배경에)
         };
         return textColors[model] || '#000000';
@@ -310,7 +307,6 @@ document.addEventListener('DOMContentLoaded', () => {
             'Go_Forward': '직진',
             'Stop': '정지',
             'Scooter': '스쿠터',
-            'Signal': '신호등',
             'Sound_Button': '음향신호기'
         };
         return nameMap[className] || className;
@@ -320,7 +316,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function getBoundingBoxColor(index) {
         const colors = [
             '#FF1493', // 딥핑크 (스쿠터)
-            '#FF4500', // 오렌지레드 (신호등)
             '#00FF7F', // 스프링그린 (음향 신호기)
             '#FFD700', // 골드 (블록)
             '#FF8000', // 다크오렌지
@@ -469,10 +464,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // 방향 업데이트
         navDirection.textContent = getDirectionText(nav.direction);
         navDirection.style.color = getDirectionColor(nav.direction);
-        
-        // 신호등 정보
-        navSignal.textContent = nav.signals.traffic_light ? '감지됨' : '없음';
-        navSignal.style.color = nav.signals.traffic_light ? '#4caf50' : '#666';
         
         // 음향 신호기 정보
         navButton.textContent = nav.signals.sound_button ? '감지됨' : '없음';

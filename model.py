@@ -13,7 +13,6 @@ class BlindNavigationModel:
         self.model_paths = {
             'block': './block.pt',
             'scooter': './scooter.pt', 
-            'sinho': './sinho.pt',
             'button': './button.pt'
         }
         
@@ -67,20 +66,8 @@ class BlindNavigationModel:
             except Exception as e:
                 print(f"스쿠터 모델 처리 오류: {e}")
                 model_results['scooter'] = None
-        
-        # 3. 신호등 모델
-        if self.models['sinho']:
-            try:
-                results_sinho = self.models['sinho'](image, verbose=False, conf=self.conf_threshold)
-                model_results['sinho'] = results_sinho[0]
-                sinho_classes, sinho_boxes = self._process_sinho_results(results_sinho[0])
-                detected_classes.extend(sinho_classes)
-                detected_boxes.extend(sinho_boxes)
-            except Exception as e:
-                print(f"신호등 모델 처리 오류: {e}")
-                model_results['sinho'] = None
-        
-        # 4. 음향 신호기 모델
+
+        # 3. 음향 신호기 모델
         if self.models['button']:
             try:
                 results_button = self.models['button'](image, verbose=False, conf=self.conf_threshold)
@@ -153,27 +140,6 @@ class BlindNavigationModel:
         
         return classes, boxes
     
-    def _process_sinho_results(self, results):
-        """신호등 모델 결과 처리"""
-        classes = []
-        boxes = []
-        
-        if results and results.boxes is not None:
-            for box_data in results.boxes:
-                confidence = float(box_data.conf[0])
-                box_coords = box_data.xyxy[0].cpu().numpy().astype(int)
-                
-                if confidence >= self.conf_threshold:
-                    classes.append('Signal')
-                    boxes.append({
-                        'class': 'Signal',
-                        'confidence': confidence,
-                        'box': box_coords.tolist(),
-                        'model': 'sinho'
-                    })
-        
-        return classes, boxes
-    
     def _process_button_results(self, results):
         """음향 신호기 모델 결과 처리"""
         classes = []
@@ -209,7 +175,6 @@ class BlindNavigationModel:
         # 각 모델별 바운딩 박스 그리기
         colors = {
             'scooter': (255, 0, 255),  # 마젠타 (스쿠터)
-            'sinho': (0, 200, 255),    # 오렌지 (신호등)
             'button': (0, 255, 200)    # 연두색 (음향 신호기)
         }
         
@@ -224,7 +189,6 @@ class BlindNavigationModel:
                         # 라벨 텍스트
                         label_map = {
                             'scooter': 'Scooter',
-                            'sinho': 'Signal',
                             'button': 'Sound Button'
                         }
                         label = f"{label_map[model_name]}: {confidence:.2f}"
@@ -484,7 +448,6 @@ class BlindNavigationModel:
             'direction': 'none',
             'warnings': [],
             'signals': {
-                'traffic_light': False,
                 'sound_button': False
             },
             'obstacles': []
@@ -507,9 +470,6 @@ class BlindNavigationModel:
             navigation_info['obstacles'].append('scooter')
         
         # 신호 정보
-        if 'Signal' in detected_classes:
-            navigation_info['signals']['traffic_light'] = True
-        
         if 'Sound_Button' in detected_classes:
             navigation_info['signals']['sound_button'] = True
         
