@@ -40,7 +40,6 @@ class BlindNavigationModel:
         """이미지에서 다중 모델로 객체 감지"""
         detected_classes = []
         detected_boxes = []
-        result_image = image.copy()
         
         # 각 모델별 결과 저장
         model_results = {}
@@ -93,13 +92,12 @@ class BlindNavigationModel:
                 print(f"음향 신호기 모델 처리 오류: {e}")
                 model_results['button'] = None
         
-        # 결과 이미지 생성 및 경로 분석
-        result_image = self._draw_results(image, model_results)
-        
         # 네비게이션 정보 생성
         navigation_info = self._generate_navigation_info(model_results, detected_classes, detected_boxes)
         
-        return result_image, detected_classes, detected_boxes, navigation_info
+        all_box_coords = [item['box'] for item in detected_boxes]
+        
+        return all_box_coords, detected_classes, detected_boxes, navigation_info
     
     def _process_block_results(self, results):
         """블록 모델 결과 처리"""
@@ -426,3 +424,41 @@ class BlindNavigationModel:
             navigation_info['warnings'].append('전방에 장애물이 있으니 주의하세요')
         
         return navigation_info
+
+    def get_block_details(self, image):
+        """블록 모델의 상세 정보를 반환 (화살표 렌더링용)"""
+        if not self.models['block']:
+            return {'stop_boxes': [], 'go_boxes': [], 'merged_stop_boxes': []}
+        
+        try:
+            results_block = self.models['block'](image, verbose=False, conf=self.conf_threshold)
+            block_results = results_block[0]
+            
+            if not block_results.boxes:
+                return {'stop_boxes': [], 'go_boxes': [], 'merged_stop_boxes': []}
+            
+            initial_stop_boxes, go_boxes = [], []
+            
+            for box_data in block_results.boxes:
+                cls_id = int(box_data.cls[0])
+                confidence = float(box_data.conf[0])
+                box = box_data.xyxy[0].cpu().numpy().astype(int).tolist()
+                
+                if confidence >= self.conf_threshold:
+                    if cls_id == 1:  # Stop
+                        initial_stop_boxes.append(box)
+                    else:  # Go_Forward (cls_id == 0)
+                        go_boxes.append(box)
+            
+            # 겹치는 Stop 박스 병합
+            merged_stop_boxes = self._merge_close_boxes(initial_stop_boxes)
+            
+            return {
+                'stop_boxes': initial_stop_boxes,
+                'go_boxes': go_boxes,
+                'merged_stop_boxes': merged_stop_boxes
+            }
+            
+        except Exception as e:
+            print(f"블록 상세 정보 추출 오류: {e}")
+            return {'stop_boxes': [], 'go_boxes': [], 'merged_stop_boxes': []}

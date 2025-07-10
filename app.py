@@ -71,23 +71,29 @@ def handle_image(data):
         img = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
     
     # 다중 모델로 객체 감지
-    result_img, detected_classes, detected_boxes, navigation_info = navigation_model.detect(img)
+    all_box_coords, detected_classes, detected_boxes, navigation_info = navigation_model.detect(img)
+    
+    # 블록 모델의 상세 정보 추출 (화살표 렌더링용)
+    block_details = navigation_model.get_block_details(img)
     
     # 디버깅 정보 출력
     print("\n=== 감지 결과 ===")
     print(f"감지된 클래스: {detected_classes}")
     print(f"감지된 박스 수: {len(detected_boxes)}")
     print(f"네비게이션 정보: {navigation_info}")
+    print(f"모든 바운딩 박스 좌표: {all_box_coords}")
+    print(f"블록 상세 정보: {block_details}")
     
-    # 흑백 모드인 경우, 결과 이미지도 그레이스케일로 변환
-    if grayscale_mode:
-        result_gray = cv2.cvtColor(result_img, cv2.COLOR_BGR2GRAY)
-        result_img = cv2.cvtColor(result_gray, cv2.COLOR_GRAY2BGR)
+    # 결과 이미지를 생성하지 않으므로 관련 코드 주석 처리 또는 삭제
+    # # 흑백 모드인 경우, 결과 이미지도 그레이스케일로 변환
+    # if grayscale_mode:
+    #     result_gray = cv2.cvtColor(result_img, cv2.COLOR_BGR2GRAY)
+    #     result_img = cv2.cvtColor(result_gray, cv2.COLOR_GRAY2BGR)
     
-    # 압축 품질 최대화
-    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 100]
-    _, buffer = cv2.imencode('.jpg', result_img, encode_param)
-    result_data = base64.b64encode(buffer).decode('utf-8')
+    # # 압축 품질 최대화
+    # encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 100]
+    # _, buffer = cv2.imencode('.jpg', result_img, encode_param)
+    # result_data = base64.b64encode(buffer).decode('utf-8')
     
     # 처리 시간 측정
     process_time = time.time() - start_time
@@ -95,10 +101,12 @@ def handle_image(data):
     
     # 응답 데이터 준비
     response_data = {
-        'image': f'data:image/jpeg;base64,{result_data}',
+        'image': '', # 이미지를 보내지 않음
         'classes': detected_classes,
         'boxes': detected_boxes,
+        'box_coords': all_box_coords, # 바운딩 박스 좌표 추가
         'navigation': navigation_info,
+        'block_details': block_details, # 블록 모델 상세 정보 추가
         'grayscale_mode': grayscale_mode
     }
     
@@ -129,21 +137,22 @@ def upload_image():
             img = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2BGR)
 
         # 모델 처리
-        result_img, detected_classes, detected_boxes, navigation_info = navigation_model.detect(img)
+        all_box_coords, detected_classes, detected_boxes, navigation_info = navigation_model.detect(img)
 
-        if grayscale_mode:
-            result_gray = cv2.cvtColor(result_img, cv2.COLOR_BGR2GRAY)
-            result_img = cv2.cvtColor(result_gray, cv2.COLOR_GRAY2BGR)
+        # if grayscale_mode:
+        #     result_gray = cv2.cvtColor(result_img, cv2.COLOR_BGR2GRAY)
+        #     result_img = cv2.cvtColor(result_gray, cv2.COLOR_GRAY2BGR)
 
-        # 이미지 -> base64 인코딩
-        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 100]
-        _, buffer = cv2.imencode('.jpg', result_img, encode_param)
-        result_data = base64.b64encode(buffer).decode('utf-8')
+        # # 이미지 -> base64 인코딩
+        # encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 100]
+        # _, buffer = cv2.imencode('.jpg', result_img, encode_param)
+        # result_data = base64.b64encode(buffer).decode('utf-8')
 
         return render_template('result.html',
-                               image=result_data,
+                               image='', # 이미지를 보내지 않음
                                classes=detected_classes,
                                boxes=detected_boxes,
+                               box_coords=all_box_coords, # 바운딩 박스 좌표 추가
                                navigation=navigation_info)
 
     return render_template('upload.html')
