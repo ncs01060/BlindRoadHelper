@@ -88,7 +88,9 @@
 
   
         document.getElementById('start-camera').addEventListener('click', () => {
-            speak("안녕")
+            const utter = new SpeechSynthesisUtterance("음성 안내를 시작합니다.");
+    utter.lang = 'ko-KR';
+    speechSynthesis.speak(utter);  // iOS에서 TTS 활성화
 });
 const socket = io();
 
