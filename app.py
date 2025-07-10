@@ -40,7 +40,10 @@ def handle_start_camera():
 
 @socketio.on('connect')
 def handle_connect():
+    global grayscale_mode
     print('Client connected')
+    # 클라이언트 연결 시 현재 흑백 모드 상태를 전송
+    emit('grayscale_mode_sync', {'grayscale_mode': grayscale_mode})
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -64,7 +67,6 @@ def handle_image(data):
         return
     
     # 흑백 모드가 활성화된 경우 이미지를 그레이스케일로 변환
-    original_img = img.copy()
     if grayscale_mode:
         print("흑백 모드로 이미지 처리 중...")
         img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)

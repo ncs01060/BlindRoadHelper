@@ -81,6 +81,14 @@ document.addEventListener('DOMContentLoaded', () => {
             updateInstruction('서버 연결이 끊겼습니다', 'danger');
         });
         
+        socket.on('grayscale_mode_sync', (data) => {
+            // 서버로부터 흑백 모드 상태 동기화
+            if (data.hasOwnProperty('grayscale_mode')) {
+                updateGrayscaleMode(data.grayscale_mode);
+                console.log('흑백 모드 상태 동기화:', data.grayscale_mode);
+            }
+        });
+
         socket.on('result', (data) => {
             // 이미지는 더 이상 표시하지 않음 (실시간 카메라 사용)
             pendingRequest = false;
@@ -141,6 +149,11 @@ document.addEventListener('DOMContentLoaded', () => {
         overlayCanvas.style.pointerEvents = 'none';
         overlayCanvas.style.zIndex = '10';
         overlayCanvas.style.borderRadius = '10px';
+        
+        // 현재 흑백 모드 상태 적용
+        if (grayscaleMode) {
+            overlayCanvas.classList.add('grayscale');
+        }
         
         // 카메라 컨테이너에 캔버스 추가
         const cameraContainer = document.querySelector('.camera-container');
@@ -452,6 +465,25 @@ document.addEventListener('DOMContentLoaded', () => {
         grayscaleToggle.textContent = grayscaleMode ? '컬러 모드' : '흑백 모드';
         grayscaleToggle.classList.toggle('active', grayscaleMode);
         debugMode.textContent = grayscaleMode ? '흑백' : '컬러';
+        
+        // 실시간 비디오에 흑백 필터 적용/제거
+        if (video) {
+            if (grayscaleMode) {
+                video.classList.add('grayscale');
+            } else {
+                video.classList.remove('grayscale');
+            }
+        }
+        
+        // 오버레이 캔버스에도 흑백 필터 적용/제거
+        if (overlayCanvas) {
+            if (grayscaleMode) {
+                overlayCanvas.classList.add('grayscale');
+            } else {
+                overlayCanvas.classList.remove('grayscale');
+            }
+        }
+        
         console.log(`흑백 모드 상태 변경: ${grayscaleMode ? '활성화됨' : '비활성화됨'}`);
     }
     
@@ -727,6 +759,11 @@ document.addEventListener('DOMContentLoaded', () => {
             video.addEventListener('loadeddata', () => {
                 console.log('비디오 데이터 로드됨');
                 setTimeout(resizeOverlayCanvas, 100);
+                
+                // 비디오 로드 시 현재 흑백 모드 상태 적용
+                if (grayscaleMode) {
+                    video.classList.add('grayscale');
+                }
             });
             video.addEventListener('resize', resizeOverlayCanvas);
             window.addEventListener('resize', resizeOverlayCanvas);
