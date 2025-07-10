@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+'<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -77,7 +77,51 @@
             </details>
         </div>
     </div>
+    <script>
 
+  
+        document.getElementById('start-camera').addEventListener('click', () => {
+            speak("안녕")
+});
+const socket = io();
+
+let lastSpokenMessage = "";
+
+socket.on('connect', () => {
+    document.getElementById("status-text").textContent = "서버에 연결됨";
+    
+});
+
+socket.on('result', function(data) {
+    // 이미지 업데이트
+    const resultImage = document.getElementById('result');
+    resultImage.src = data.image;
+
+    // 네비게이션 정보 출력
+    const nav = data.navigation || {};
+    document.getElementById('nav-state').textContent = nav.state || '없음';
+    document.getElementById('nav-direction').textContent = nav.direction || '없음';
+    document.getElementById('nav-signal').textContent = nav.signal || '없음';
+    document.getElementById('nav-button').textContent = nav.button || '없음';
+    document.getElementById('nav-obstacles').textContent = nav.obstacles || '없음';
+
+    // 디버깅 정보 업데이트
+    document.getElementById('debug-classes').textContent = data.classes.join(', ') || '없음';
+    document.getElementById('debug-boxes').textContent = data.boxes.length || 0;
+    document.getElementById('debug-mode').textContent = data.grayscale_mode ? '흑백' : '컬러';
+    document.getElementById('debug-status').textContent = '완료';
+
+    // TTS 안내문 생성 및 음성 재생
+    
+});
+
+// 의미 있는 안내 문장 구성
+function generateContextualMessage(nav) {
+    let parts = [];
+    speechSynthesis.resume(); // 음성 예열
+    const testUtterance = new SpeechSynthesisUtterance("안시");
+    testUtterance.lang = 'ko-KR';
+    speechSynthesis.speak(testUtterance);}</script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>

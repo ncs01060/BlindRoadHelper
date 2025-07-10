@@ -41,6 +41,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentArrows = null; // 화살표 정보 저장
     let renderTimer = null;
     
+    function speak(text) {
+        speechSynthesis.resume(); // 음성 예열
+    const testUtterance = new SpeechSynthesisUtterance(text);
+    testUtterance.lang = 'ko-KR';
+    speechSynthesis.speak(testUtterance);
+
+    }
+    function cancel_the_speak() {
+        speechSynthesis.cancel();
+    }
+
     // Socket.IO 연결 설정
     function setupSocket() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -53,6 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         socket.on('connect', () => {
+            
             statusText.textContent = '서버에 연결되었습니다.';
             statusText.style.color = 'green';
             debugStatus.textContent = '연결됨';
@@ -438,12 +450,13 @@ document.addEventListener('DOMContentLoaded', () => {
             updateInstruction('경로를 확인하는 중입니다', 'neutral');
         }
     }
-    
+    let before = ''
     // 안내 메시지 업데이트
     function updateInstruction(message, type) {
         instructionText.textContent = message;
         instructionBox.className = `instruction ${type}`;
-        
+        if (before != message) {speak(message)}
+        before = message
         // 중요한 메시지는 진동으로 알림 (모바일 지원)
         if (type === 'danger' || type === 'warning') {
             if (navigator.vibrate) {
