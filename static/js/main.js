@@ -51,6 +51,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let ttsTimer = null; // 지연 실행용 타이머
     let currentUtterance = null; // 현재 실행 중인 utterance
     
+    // 재읽기 기능 관련 변수들
+    let repeatTimer = null; // 재읽기 타이머
+    let currentMessage = ''; // 현재 표시 중인 메시지
+    let messageStartTime = 0; // 메시지 시작 시간
+    const REPEAT_DELAY = 3000; // 3초 후 재읽기
+    
     function speak(text) {
         // 기존 TTS 즉시 취소
         speechSynthesis.cancel();
@@ -106,6 +112,11 @@ document.addEventListener('DOMContentLoaded', () => {
             clearTimeout(ttsTimer);
             ttsTimer = null;
         }
+        // 재읽기 타이머도 정리
+        if (repeatTimer) {
+            clearTimeout(repeatTimer);
+            repeatTimer = null;
+        }
     }
     
     // 지연된 TTS 실행 - 최신 메시지만 읽도록 함
@@ -130,6 +141,31 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             ttsTimer = null;
         }, delay);
+    }
+    
+    // 재읽기 타이머 설정
+    function setupRepeatTimer(message) {
+        // 기존 재읽기 타이머 정리
+        if (repeatTimer) {
+            clearTimeout(repeatTimer);
+            repeatTimer = null;
+        }
+        
+        // 3초마다 반복해서 같은 메시지가 유지되고 있으면 재읽기
+        function scheduleNextRepeat() {
+            repeatTimer = setTimeout(() => {
+                // 현재 메시지가 여전히 같고, TTS가 진행 중이 아닐 때만 재읽기
+                if (currentMessage === message && !isTTSSpeaking) {
+                    console.log('🔁 같은 메시지 3초 유지 - 재읽기 실행:', message);
+                    speak(message);
+                }
+                // 3초 후 다시 반복 스케줄링 (무한 반복)
+                scheduleNextRepeat();
+            }, REPEAT_DELAY);
+        }
+        
+        // 첫 번째 반복 시작
+        scheduleNextRepeat();
     }
 
     // Socket.IO 연결 설정
@@ -171,6 +207,20 @@ document.addEventListener('DOMContentLoaded', () => {
             debugStatus.textContent = '처리 완료';
             
             console.log('🔍 서버 응답 데이터:', data);
+            
+            // 스쿠터 감지 전용 디버깅
+            if (data.classes && data.classes.includes('Scooter')) {
+                console.log('🛴 스쿠터 클래스 감지됨!');
+            }
+            if (data.boxes) {
+                const scooterBoxes = data.boxes.filter(box => box.class === 'Scooter');
+                if (scooterBoxes.length > 0) {
+                    console.log('🛴 스쿠터 박스 감지됨!', scooterBoxes);
+                }
+            }
+            if (data.navigation && data.navigation.obstacles) {
+                console.log('🔍 장애물 정보:', data.navigation.obstacles);
+            }
             
             // 흑백 모드 상태 동기화
             if (data.hasOwnProperty('grayscale_mode')) {
@@ -630,14 +680,55 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const nav = data.navigation;
         
-        // 우선순위 1: 스쿠터 감지 시 장애물 경고
-        if (nav.obstacles && nav.obstacles.includes('Scooter')) {
+        // 디버깅: 네비게이션 데이터 전체 로그
+        console.log('🔍 네비게이션 데이터 전체:', nav);
+        console.log('🔍 장애물 데이터:', nav.obstacles);
+        
+        // 우선순위 1: 스쿠터 감지 시 장애물 경고 (여러 방식으로 체크)
+        let scooterDetected = false;
+        
+        // 방법 1: obstacles 배열에서 확인
+        if (nav.obstacles && Array.isArray(nav.obstacles) && nav.obstacles.includes('Scooter')) {
+            scooterDetected = true;
+            console.log('🛴 스쿠터 감지됨 (obstacles 배열):', nav.obstacles);
+        }
+        
+        // 방법 2: obstacles가 문자열인 경우
+        if (nav.obstacles && typeof nav.obstacles === 'string' && nav.obstacles.includes('Scooter')) {
+            scooterDetected = true;
+            console.log('🛴 스쿠터 감지됨 (obstacles 문자열):', nav.obstacles);
+        }
+        
+        // 방법 3: 박스 데이터에서 직접 확인 (백업)
+        if (!scooterDetected && data.boxes) {
+            const hasScooter = data.boxes.some(box => box.class === 'Scooter');
+            if (hasScooter) {
+                scooterDetected = true;
+                console.log('🛴 스쿠터 감지됨 (박스 데이터):', data.boxes.filter(box => box.class === 'Scooter'));
+            }
+        }
+        
+        // 방법 4: classes 배열에서 확인 (백업)
+        if (!scooterDetected && data.classes && data.classes.includes('Scooter')) {
+            scooterDetected = true;
+            console.log('🛴 스쿠터 감지됨 (classes 배열):', data.classes);
+        }
+        
+        if (scooterDetected) {
             updateInstruction('장애물이 감지되었습니다!', 'danger');
             updateDirectionDisplay([]); // 장애물 감지 시 방향 정보 숨기기
             return;
         }
         
-        // 우선순위 2: 점형 블록(Stop) 감지 - 화살표와 함께 처리
+        // 우선순위 2: 음성신호기 감지 시 안내 (독립적으로 작동)
+        if (nav.signals && nav.signals.sound_button) {
+            console.log('🔊 음성신호기 감지됨 - 사용자에게 안내 중');
+            updateInstruction('음성신호기가 감지되었습니다', 'info');
+            updateDirectionDisplay([]); // 음성신호기 감지 시 방향 정보 숨기기
+            return;
+        }
+        
+        // 우선순위 3: 점형 블록(Stop) 감지 - 화살표와 함께 처리
         if (nav.direction === 'stop') {
             // 점형 블록과 함께 화살표가 있는 경우 (선형과 점형이 연결됨)
             if (data.arrows && data.arrows.arrows && data.arrows.arrows.length > 0) {
@@ -659,7 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         
-        // 우선순위 3: 화살표 방향 안내 (교차로에서)
+        // 우선순위 4: 화살표 방향 안내 (교차로에서)
         if (data.arrows && data.arrows.arrows && data.arrows.arrows.length > 0) {
             const directions = getArrowDirections(data.arrows.arrows);
             if (directions.length > 0) {
@@ -674,14 +765,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // 우선순위 4: 직진 안내
+        // 우선순위 5: 직진 안내
         if (nav.state === 'straight') {
             updateInstruction('직진하세요', 'success');
             updateDirectionDisplay(['위']); // 직진 방향 표시
             return;
         }
         
-        // 우선순위 5: 교차로 기본 안내
+        // 우선순위 6: 교차로 기본 안내
         if (nav.state === 'intersection') {
             updateInstruction('교차로가 감지되었습니다', 'warning');
             updateDirectionDisplay([]); // 방향 정보 숨기기
@@ -743,17 +834,35 @@ document.addEventListener('DOMContentLoaded', () => {
         instructionText.textContent = message;
         instructionBox.className = `instruction ${type}`;
         
+        // 현재 시간 기록
+        const now = Date.now();
+        
         // 이전 메시지와 다를 때만 TTS 실행
         if (before != message) {
             // 지연된 TTS 실행으로 최신 메시지만 읽도록 함
             speakWithDelay(message);
             before = message;
+            currentMessage = message;
+            messageStartTime = now;
+            
+            // 새로운 메시지에 대한 재읽기 타이머 설정 (3초마다 반복)
+            setupRepeatTimer(message);
+        } else {
+            // 같은 메시지인 경우에도 현재 메시지 업데이트
+            currentMessage = message;
         }
         
-        // 중요한 메시지는 진동으로 알림 (모바일 지원)
-        if (type === 'danger' || type === 'warning') {
-            if (navigator.vibrate) {
+        // 진동 알림 처리 (모바일 지원)
+        if (navigator.vibrate) {
+            if (type === 'danger') {
+                // 스쿠터 등 위험 상황: 강한 진동
                 navigator.vibrate([200, 100, 200]);
+            } else if (type === 'info') {
+                // 음성신호기: 부드러운 진동 패턴
+                navigator.vibrate([100, 50, 100, 50, 100]);
+            } else if (type === 'warning') {
+                // 점형블록 등 주의 상황: 중간 진동
+                navigator.vibrate([150, 100, 150]);
             }
         }
         
@@ -885,6 +994,17 @@ document.addEventListener('DOMContentLoaded', () => {
         currentNavigation = null;
         currentArrows = null;
         
+        // 메시지 관련 변수 초기화
+        before = '';
+        currentMessage = '';
+        messageStartTime = 0;
+        
+        // 재읽기 타이머 정리
+        if (repeatTimer) {
+            clearTimeout(repeatTimer);
+            repeatTimer = null;
+        }
+        
         // 방향 정보 초기화 (숨기기)
         updateDirectionDisplay([]);
         
@@ -963,6 +1083,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         // TTS 정리
         cancel_the_speak();
+        
+        // 재읽기 타이머 정리
+        if (repeatTimer) {
+            clearTimeout(repeatTimer);
+            repeatTimer = null;
+        }
     });
     
     // 화면 방향 변경 시 캔버스 크기 조정
