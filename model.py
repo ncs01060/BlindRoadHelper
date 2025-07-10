@@ -32,7 +32,7 @@ class BlindNavigationModel:
                 self.models[model_name] = None
         
         # 신뢰도 임계값
-        self.conf_threshold = 0.5
+        self.conf_threshold = 0.7
         
         print("모델 초기화 완료!")
     
@@ -142,7 +142,7 @@ class BlindNavigationModel:
                 confidence = float(box_data.conf[0])
                 box_coords = box_data.xyxy[0].cpu().numpy().astype(int)
                 
-                if confidence >= self.conf_threshold:
+                if confidence >= 0.5: #스쿠터 모델만 임계값 낮게(인식 잘 안됨)
                     classes.append('Scooter')
                     boxes.append({
                         'class': 'Scooter',
