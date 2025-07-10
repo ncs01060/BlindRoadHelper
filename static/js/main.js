@@ -17,6 +17,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const warningBox = document.getElementById('warning-box');
     const warningList = document.getElementById('warning-list');
     
+    // 방향 표시 요소들
+    const directionDisplay = document.getElementById('direction-display');
+    const directionList = document.getElementById('direction-list');
+    
     // 디버깅 정보 요소들
     const debugClasses = document.getElementById('debug-classes');
     const debugBoxes = document.getElementById('debug-boxes');
@@ -512,35 +516,119 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateInstructionByNavigationData(data) {
         if (!data.navigation) {
             updateInstruction('데이터를 처리하는 중입니다', 'neutral');
+            updateDirectionDisplay([]); // 방향 정보 숨기기
             return;
         }
         
         const nav = data.navigation;
         
-        // 우선순위 1: 경고 사항
-        if (nav.warnings && nav.warnings.length > 0) {
-            const primaryWarning = nav.warnings[0];
-            updateInstruction(primaryWarning, 'warning');
+        // 우선순위 1: 스쿠터 감지 시 장애물 경고
+        if (nav.obstacles && nav.obstacles.includes('Scooter')) {
+            updateInstruction('장애물이 감지되었습니다!', 'danger');
+            updateDirectionDisplay([]); // 장애물 감지 시 방향 정보 숨기기
             return;
         }
         
-        // 우선순위 2: 방향 안내
-        if (nav.state === 'intersection') {
-            if (nav.direction === 'stop') {
-                updateInstruction('교차로에서 멈춤 신호입니다', 'danger');
-            } else {
-                updateInstruction('교차로가 감지되었습니다', 'warning');
+        // 우선순위 2: 점형 블록(Stop) 감지 - 화살표와 함께 처리
+        if (nav.direction === 'stop') {
+            // 점형 블록과 함께 화살표가 있는 경우 (선형과 점형이 연결됨)
+            if (data.arrows && data.arrows.arrows && data.arrows.arrows.length > 0) {
+                const directions = getArrowDirections(data.arrows.arrows);
+                if (directions.length > 0) {
+                    const directionText = directions.join(', ');
+                    if (directions.length > 1) {
+                        updateInstruction(`점형블록이 감지되었습니다. ${directionText} 방향으로 갈 수 있습니다`, 'warning');
+                    } else {
+                        updateInstruction(`점형블록이 감지되었습니다. ${directionText} 방향으로 갈 수 있습니다`, 'warning');
+                    }
+                    updateDirectionDisplay(directions); // 방향 정보 표시
+                    return;
+                }
             }
-        } else if (nav.state === 'straight') {
-            if (nav.obstacles.length > 0) {
-                updateInstruction('직진 가능하지만 장애물 주의', 'warning');
-            } else {
-                updateInstruction('직진하세요', 'success');
-            }
-        } else {
-            updateInstruction('경로를 확인하는 중입니다', 'neutral');
+            // 점형 블록만 있는 경우
+            updateInstruction('점형블록이 감지되었습니다', 'warning');
+            updateDirectionDisplay([]); // 방향 정보 숨기기
+            return;
         }
+        
+        // 우선순위 3: 화살표 방향 안내 (교차로에서)
+        if (data.arrows && data.arrows.arrows && data.arrows.arrows.length > 0) {
+            const directions = getArrowDirections(data.arrows.arrows);
+            if (directions.length > 0) {
+                const directionText = directions.join(', ');
+                if (directions.length > 1) {
+                    updateInstruction(`${directionText} 방향으로 갈 수 있습니다`, 'warning');
+                } else {
+                    updateInstruction(`${directionText} 방향으로 가세요`, 'success');
+                }
+                updateDirectionDisplay(directions); // 방향 정보 표시
+                return;
+            }
+        }
+        
+        // 우선순위 4: 직진 안내
+        if (nav.state === 'straight') {
+            updateInstruction('직진하세요', 'success');
+            updateDirectionDisplay(['위']); // 직진 방향 표시
+            return;
+        }
+        
+        // 우선순위 5: 교차로 기본 안내
+        if (nav.state === 'intersection') {
+            updateInstruction('교차로가 감지되었습니다', 'warning');
+            updateDirectionDisplay([]); // 방향 정보 숨기기
+            return;
+        }
+        
+        // 기본: 경로 확인 중
+        updateInstruction('경로를 확인하는 중입니다', 'neutral');
+        updateDirectionDisplay([]); // 방향 정보 숨기기
     }
+    
+    // 화살표 방향 분석 함수
+    function getArrowDirections(arrows) {
+        const directions = [];
+        
+        arrows.forEach(arrow => {
+            if (arrow.start && arrow.end && arrow.start.length >= 2 && arrow.end.length >= 2) {
+                const deltaX = arrow.end[0] - arrow.start[0];
+                const deltaY = arrow.end[1] - arrow.start[1];
+                
+                // 각도 계산 (라디안)
+                const angle = Math.atan2(deltaY, deltaX);
+                // 각도를 도(degree)로 변환
+                const degrees = (angle * 180 / Math.PI + 360) % 360;
+                
+                // 방향 결정 (8방향으로 나누어 판단)
+                let direction = '';
+                if (degrees >= 337.5 || degrees < 22.5) {
+                    direction = '오른쪽';
+                } else if (degrees >= 22.5 && degrees < 67.5) {
+                    direction = '오른쪽 아래';
+                } else if (degrees >= 67.5 && degrees < 112.5) {
+                    direction = '아래';
+                } else if (degrees >= 112.5 && degrees < 157.5) {
+                    direction = '왼쪽 아래';
+                } else if (degrees >= 157.5 && degrees < 202.5) {
+                    direction = '왼쪽';
+                } else if (degrees >= 202.5 && degrees < 247.5) {
+                    direction = '왼쪽 위';
+                } else if (degrees >= 247.5 && degrees < 292.5) {
+                    direction = '위';
+                } else if (degrees >= 292.5 && degrees < 337.5) {
+                    direction = '오른쪽 위';
+                }
+                
+                // 중복 제거를 위해 배열에 추가
+                if (direction && !directions.includes(direction)) {
+                    directions.push(direction);
+                }
+            }
+        });
+        
+        return directions;
+    }
+    
     let before = ''
     // 안내 메시지 업데이트
     function updateInstruction(message, type) {
@@ -678,6 +766,9 @@ document.addEventListener('DOMContentLoaded', () => {
         currentNavigation = null;
         currentArrows = null;
         
+        // 방향 정보 초기화 (숨기기)
+        updateDirectionDisplay([]);
+        
         isStreaming = false;
         startButton.textContent = '카메라 시작';
         statusText.textContent = '카메라가 중지되었습니다.';
@@ -757,4 +848,53 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('orientationchange', () => {
         setTimeout(resizeOverlayCanvas, 100);
     });
+    
+    // 방향 정보 표시 업데이트
+    function updateDirectionDisplay(directions) {
+        // 방향 리스트 초기화
+        directionList.innerHTML = '';
+        
+        if (!directions || directions.length === 0) {
+            // 방향이 없을 때는 반투명하게 처리
+            directionDisplay.classList.add('hidden');
+            return;
+        }
+        
+        // 방향별로 아이템 생성
+        directions.forEach((direction, index) => {
+            const directionItem = document.createElement('div');
+            directionItem.className = 'direction-item';
+            
+            // 첫 번째 방향은 primary, 나머지는 secondary 스타일
+            if (index === 0) {
+                directionItem.classList.add('primary');
+            } else {
+                directionItem.classList.add('secondary');
+            }
+            
+            // 방향에 따른 이모지 추가
+            const emoji = getDirectionEmoji(direction);
+            directionItem.textContent = `${emoji} ${direction}`;
+            
+            directionList.appendChild(directionItem);
+        });
+        
+        // 방향 표시 박스 활성화
+        directionDisplay.classList.remove('hidden');
+    }
+    
+    // 방향별 이모지 반환
+    function getDirectionEmoji(direction) {
+        const emojiMap = {
+            '위': '⬆️',
+            '아래': '⬇️',
+            '왼쪽': '⬅️',
+            '오른쪽': '➡️',
+            '왼쪽 위': '↖️',
+            '오른쪽 위': '↗️',
+            '왼쪽 아래': '↙️',
+            '오른쪽 아래': '↘️'
+        };
+        return emojiMap[direction] || '🧭';
+    }
 });
