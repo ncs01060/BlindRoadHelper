@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 바운딩 박스와 네비게이션 데이터 저장
     let currentBoxes = [];
+    let currentBoxData = []; // 클래스 정보가 포함된 박스 데이터
     let currentNavigation = null;
     let currentArrows = null; // 화살표 정보 저장
     let renderTimer = null;
@@ -94,7 +95,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentBoxes = data.box_coords;
             }
             if (data.boxes) {
-                currentBoxes = data.boxes.map(box => box.box); // 좌표만 추출
+                currentBoxData = data.boxes; // 클래스 정보가 포함된 전체 박스 데이터
+                currentBoxes = data.boxes.map(box => box.box); // 좌표만 추출 (호환성 유지)
             }
             
             // 네비게이션 정보 저장 및 업데이트
@@ -204,40 +206,125 @@ document.addEventListener('DOMContentLoaded', () => {
         
         console.log(`바운딩 박스 그리기: ${currentBoxes.length}개, 스케일: ${scaleX.toFixed(2)}x${scaleY.toFixed(2)}`);
         
-        currentBoxes.forEach((box, index) => {
-            if (box && box.length >= 4) {
-                const [x1, y1, x2, y2] = box;
-                
-                // 좌표 스케일링
-                const scaledX1 = x1 * scaleX;
-                const scaledY1 = y1 * scaleY;
-                const scaledX2 = x2 * scaleX;
-                const scaledY2 = y2 * scaleY;
-                
-                // 박스 색상 결정 (모델별로 다른 색상)
-                overlayContext.strokeStyle = getBoundingBoxColor(index);
-                overlayContext.lineWidth = 3;
-                overlayContext.strokeRect(scaledX1, scaledY1, scaledX2 - scaledX1, scaledY2 - scaledY1);
-                
-                // 라벨 표시
-                overlayContext.fillStyle = overlayContext.strokeStyle;
-                overlayContext.font = '16px Arial';
-                overlayContext.fillText(`Object ${index + 1}`, scaledX1, scaledY1 - 5);
-                
-                console.log(`박스 ${index}: [${x1}, ${y1}, ${x2}, ${y2}] -> [${scaledX1.toFixed(1)}, ${scaledY1.toFixed(1)}, ${scaledX2.toFixed(1)}, ${scaledY2.toFixed(1)}]`);
-            }
-        });
+        // currentBoxData가 있으면 클래스 정보와 함께 그리기
+        if (currentBoxData && currentBoxData.length > 0) {
+            currentBoxData.forEach((boxInfo, index) => {
+                if (boxInfo && boxInfo.box && boxInfo.box.length >= 4) {
+                    const [x1, y1, x2, y2] = boxInfo.box;
+                    
+                    // 좌표 스케일링
+                    const scaledX1 = x1 * scaleX;
+                    const scaledY1 = y1 * scaleY;
+                    const scaledX2 = x2 * scaleX;
+                    const scaledY2 = y2 * scaleY;
+                    
+                    // 모델별 색상 결정
+                    overlayContext.strokeStyle = getModelColor(boxInfo.model);
+                    overlayContext.lineWidth = 3;
+                    overlayContext.strokeRect(scaledX1, scaledY1, scaledX2 - scaledX1, scaledY2 - scaledY1);
+                    
+                    // 클래스 이름과 신뢰도 표시
+                    const className = getDisplayName(boxInfo.class);
+                    const confidence = boxInfo.confidence ? (boxInfo.confidence * 100).toFixed(1) : '';
+                    const label = confidence ? `${className} (${confidence}%)` : className;
+                    
+                    // 라벨 배경 그리기
+                    overlayContext.fillStyle = getModelColor(boxInfo.model);
+                    overlayContext.font = 'bold 14px Arial';
+                    const textMetrics = overlayContext.measureText(label);
+                    const textWidth = textMetrics.width + 8;
+                    const textHeight = 20;
+                    
+                    overlayContext.fillRect(scaledX1, scaledY1 - textHeight, textWidth, textHeight);
+                    
+                    // 라벨 텍스트 그리기 (모델별 적절한 색상 사용)
+                    overlayContext.fillStyle = getTextColor(boxInfo.model);
+                    overlayContext.fillText(label, scaledX1 + 4, scaledY1 - 6);
+                    
+                    console.log(`박스 ${index}: ${className} [${x1}, ${y1}, ${x2}, ${y2}] -> [${scaledX1.toFixed(1)}, ${scaledY1.toFixed(1)}, ${scaledX2.toFixed(1)}, ${scaledY2.toFixed(1)}]`);
+                }
+            });
+        } else {
+            // 백업: 좌표만 있는 경우
+            currentBoxes.forEach((box, index) => {
+                if (box && box.length >= 4) {
+                    const [x1, y1, x2, y2] = box;
+                    
+                    // 좌표 스케일링
+                    const scaledX1 = x1 * scaleX;
+                    const scaledY1 = y1 * scaleY;
+                    const scaledX2 = x2 * scaleX;
+                    const scaledY2 = y2 * scaleY;
+                    
+                    // 박스 색상 결정 (모델별로 다른 색상)
+                    overlayContext.strokeStyle = getBoundingBoxColor(index);
+                    overlayContext.lineWidth = 3;
+                    overlayContext.strokeRect(scaledX1, scaledY1, scaledX2 - scaledX1, scaledY2 - scaledY1);
+                    
+                    // 라벨 표시
+                    const boxColor = getBoundingBoxColor(index);
+                    const label = `Object ${index + 1}`;
+                    
+                    // 라벨 배경 그리기
+                    overlayContext.fillStyle = boxColor;
+                    overlayContext.font = 'bold 14px Arial';
+                    const textMetrics = overlayContext.measureText(label);
+                    const textWidth = textMetrics.width + 8;
+                    const textHeight = 20;
+                    
+                    overlayContext.fillRect(scaledX1, scaledY1 - textHeight, textWidth, textHeight);
+                    
+                    // 라벨 텍스트 그리기 (배경에 따라 적절한 색상 선택)
+                    overlayContext.fillStyle = (index % 2 === 0) ? '#FFFFFF' : '#000000';
+                    overlayContext.fillText(label, scaledX1 + 4, scaledY1 - 6);
+                }
+            });
+        }
     }
     
-    // 바운딩 박스 색상 결정
+    // 모델별 색상 결정
+    function getModelColor(model) {
+        const modelColors = {
+            'block': '#FFD700',    // 골드 (블록 - Go_Forward, Stop)
+            'scooter': '#FF1493',  // 딥핑크 (스쿠터)
+            'sinho': '#FF4500',    // 오렌지레드 (신호등)
+            'button': '#00FF7F'    // 스프링그린 (음향 신호기)
+        };
+        return modelColors[model] || '#FFFFFF';
+    }
+    
+    // 모델별 텍스트 색상 결정
+    function getTextColor(model) {
+        const textColors = {
+            'block': '#000000',    // 검은색 (노란 배경에)
+            'scooter': '#FFFFFF',  // 흰색 (딥핑크 배경에)
+            'sinho': '#FFFFFF',    // 흰색 (오렌지레드 배경에)
+            'button': '#000000'    // 검은색 (스프링그린 배경에)
+        };
+        return textColors[model] || '#000000';
+    }
+    
+    // 클래스 이름을 사용자 친화적으로 변환
+    function getDisplayName(className) {
+        const nameMap = {
+            'Go_Forward': '직진',
+            'Stop': '정지',
+            'Scooter': '스쿠터',
+            'Signal': '신호등',
+            'Sound_Button': '음향신호기'
+        };
+        return nameMap[className] || className;
+    }
+    
+    // 바운딩 박스 색상 결정 (백업용)
     function getBoundingBoxColor(index) {
         const colors = [
-            '#FF0080', // 마젠타 (스쿠터)
-            '#00C8FF', // 오렌지 (신호등)
-            '#00FFC8', // 연두색 (음향 신호기)
-            '#FFFF00', // 노란색 (블록)
-            '#FF8000', // 주황색
-            '#8000FF'  // 보라색
+            '#FF1493', // 딥핑크 (스쿠터)
+            '#FF4500', // 오렌지레드 (신호등)
+            '#00FF7F', // 스프링그린 (음향 신호기)
+            '#FFD700', // 골드 (블록)
+            '#FF8000', // 다크오렌지
+            '#8A2BE2'  // 블루바이올렛
         ];
         return colors[index % colors.length];
     }
@@ -251,12 +338,25 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 상태 텍스트 표시
         if (currentArrows.state_text) {
-            overlayContext.fillStyle = currentArrows.state_color || '#00FF00';
+            const stateText = `State: ${currentArrows.state_text}`;
             overlayContext.font = 'bold 20px Arial';
+            
+            // 텍스트 배경 그리기 (가독성을 위해)
+            const textMetrics = overlayContext.measureText(stateText);
+            const textWidth = textMetrics.width + 16;
+            const textHeight = 28;
+            
+            overlayContext.fillStyle = 'rgba(0, 0, 0, 0.7)'; // 반투명 검은 배경
+            overlayContext.fillRect(16, 16, textWidth, textHeight);
+            
+            // 텍스트 외곽선
             overlayContext.strokeStyle = '#000000';
             overlayContext.lineWidth = 3;
-            overlayContext.strokeText(`State: ${currentArrows.state_text}`, 20, 40);
-            overlayContext.fillText(`State: ${currentArrows.state_text}`, 20, 40);
+            overlayContext.strokeText(stateText, 24, 36);
+            
+            // 텍스트 그리기
+            overlayContext.fillStyle = '#FFFFFF';
+            overlayContext.fillText(stateText, 24, 36);
         }
         
         // 화살표 그리기
@@ -583,6 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 데이터 초기화
         currentBoxes = [];
+        currentBoxData = [];
         currentNavigation = null;
         currentArrows = null;
         
